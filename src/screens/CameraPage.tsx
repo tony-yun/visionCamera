@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {useRef, useState, useMemo, useCallback} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {
   PinchGestureHandler,
   PinchGestureHandlerGestureEvent,
@@ -18,6 +18,7 @@ import {
 } from 'react-native-vision-camera';
 import {Camera, frameRateIncluded} from 'react-native-vision-camera';
 import {
+  CAPTURE_BUTTON_SIZE,
   CONTENT_SPACING,
   MAX_ZOOM_FACTOR,
   SAFE_AREA_PADDING,
@@ -45,6 +46,7 @@ Reanimated.addWhitelistedNativeProps({
 
 const SCALE_FULL_ZOOM = 3;
 const BUTTON_SIZE = 40;
+const BORDER_WIDTH = CAPTURE_BUTTON_SIZE * 0.1;
 
 type Props = NativeStackScreenProps<Routes, 'CameraPage'>;
 export function CameraPage({navigation}: Props): React.ReactElement {
@@ -116,21 +118,6 @@ export function CameraPage({navigation}: Props): React.ReactElement {
     [devices.back, devices.front],
   );
   const supportsFlash = device?.hasFlash ?? false;
-  const supportsHdr = useMemo(
-    () => formats.some(f => f.supportsVideoHDR || f.supportsPhotoHDR),
-    [formats],
-  );
-  const supports60Fps = useMemo(
-    () =>
-      formats.some(f =>
-        f.frameRateRanges.some(rate => frameRateIncluded(rate, 60)),
-      ),
-    [formats],
-  );
-  const canToggleNightMode = enableNightMode
-    ? true // it's enabled so you have to be able to turn it off again
-    : (device?.supportsLowLightBoost ?? false) || fps > 30; // either we have native support, or we can lower the FPS
-  //#endregion
 
   const format = useMemo(() => {
     let result = formats;
@@ -175,28 +162,17 @@ export function CameraPage({navigation}: Props): React.ReactElement {
     console.log('Camera initialized!');
     setIsCameraInitialized(true);
   }, []);
-  const onMediaCaptured = useCallback(
-    (media: PhotoFile | VideoFile, type: 'photo' | 'video') => {
-      console.log(`Media captured! ${JSON.stringify(media)}`);
-      navigation.navigate('MediaPage', {
-        path: media.path,
-        type: type,
-      });
-    },
-    [navigation],
-  );
+
+  const onMediaCaptured = useCallback((media: VideoFile, type: 'video') => {
+    console.log(`Media captured! ${JSON.stringify(media)},${media},${type}`);
+  }, []);
+
   const onFlipCameraPressed = useCallback(() => {
     setCameraPosition(p => (p === 'back' ? 'front' : 'back'));
   }, []);
   const onFlashPressed = useCallback(() => {
     setFlash(f => (f === 'off' ? 'on' : 'off'));
   }, []);
-  //#endregion
-
-  //#region Tap Gesture
-  const onDoubleTap = useCallback(() => {
-    onFlipCameraPressed();
-  }, [onFlipCameraPressed]);
   //#endregion
 
   //#region Effects
@@ -267,35 +243,34 @@ export function CameraPage({navigation}: Props): React.ReactElement {
       {device != null && (
         <PinchGestureHandler onGestureEvent={onPinchGesture} enabled={isActive}>
           <Reanimated.View style={StyleSheet.absoluteFill}>
-            <TapGestureHandler onEnded={onDoubleTap} numberOfTaps={2}>
-              <ReanimatedCamera
-                ref={camera}
-                style={StyleSheet.absoluteFill}
-                device={device}
-                format={format}
-                fps={fps}
-                hdr={enableHdr}
-                lowLightBoost={device.supportsLowLightBoost && enableNightMode}
-                isActive={isActive}
-                onInitialized={onInitialized}
-                onError={onError}
-                enableZoomGesture={true}
-                animatedProps={cameraAnimatedProps}
-                photo={true}
-                video={true}
-                audio={hasMicrophonePermission}
-                orientation="portrait"
-                frameProcessorFps={1}
-                onFrameProcessorPerformanceSuggestionAvailable={
-                  onFrameProcessorSuggestionAvailable
-                }
-              />
-            </TapGestureHandler>
+            <ReanimatedCamera
+              ref={camera}
+              style={StyleSheet.absoluteFill}
+              device={device}
+              format={format}
+              fps={fps}
+              isActive={isActive}
+              onInitialized={onInitialized}
+              onError={onError}
+              enableZoomGesture={true}
+              animatedProps={cameraAnimatedProps}
+              video={true}
+              audio={hasMicrophonePermission}
+              orientation="portrait"
+              frameProcessorFps={1}
+              onFrameProcessorPerformanceSuggestionAvailable={
+                onFrameProcessorSuggestionAvailable
+              }
+            />
           </Reanimated.View>
         </PinchGestureHandler>
       )}
 
       <StatusBarBlurBackground />
+
+      <Reanimated.View style={styles.flex}>
+        <TouchableOpacity style={styles.recordingButton} />
+      </Reanimated.View>
 
       <View style={styles.rightButtonRow}>
         {supportsCameraFlipping && (
@@ -352,5 +327,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  recordingButton: {
+    width: CAPTURE_BUTTON_SIZE,
+    height: CAPTURE_BUTTON_SIZE,
+    borderRadius: CAPTURE_BUTTON_SIZE / 2,
+    borderWidth: BORDER_WIDTH,
+    borderColor: 'white',
+    marginBottom: CONTENT_SPACING,
+  },
+  flex: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
   },
 });

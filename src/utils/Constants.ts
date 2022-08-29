@@ -26,4 +26,4 @@ export const SCREEN_HEIGHT = Platform.select<number>({
 }) as number;
 
 // Capture Button
-export const CAPTURE_BUTTON_SIZE = 78;
+export const CAPTURE_BUTTON_SIZE = 60;
