@@ -55,12 +55,6 @@ export function CameraPage({navigation}: Props): React.ReactElement {
   const [isCameraInitialized, setIsCameraInitialized] = useState(false);
   const [hasMicrophonePermission, setHasMicrophonePermission] = useState(false);
   const zoom = useSharedValue(0);
-  const isPressingButton = useSharedValue(false);
-  const [recording, setRecording] = useState(false);
-  const [inter, setInter] = useState(null);
-  const [exeEvent, setExeEvent] = useState(null);
-  const isRecording = useRef(false);
-  const [number, setNumber] = useState(60);
 
   // check if camera page is active
   const isFocussed = useIsFocused();
@@ -94,13 +88,6 @@ export function CameraPage({navigation}: Props): React.ReactElement {
   }, [maxZoom, minZoom, zoom]);
   //#endregion
 
-  //#region Callbacks
-  const setIsPressingButton = useCallback(
-    (_isPressingButton: boolean) => {
-      isPressingButton.value = _isPressingButton;
-    },
-    [isPressingButton],
-  );
   // Camera callbacks
   const onError = useCallback((error: CameraRuntimeError) => {
     console.error(error);
@@ -169,41 +156,6 @@ export function CameraPage({navigation}: Props): React.ReactElement {
     },
     [],
   );
-  const cameraExecuter = async () => {
-    const video = await camera.current?.startRecording({
-      onRecordingFinished: video => console.log(video),
-      onRecordingError: error => console.error(error),
-    });
-    //Send to server
-    let formData = new FormData();
-    formData.append('file', {
-      name: 'myVideo.mp4',
-      uri: video?.uri,
-      type: 'video/mp4',
-    });
-    axios
-      .post('http://localhost/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }) //android:screenOrientation="landscape"
-      .then(res => console.log(res))
-      .catch(err => console.log(err));
-  };
-
-  useEffect(() => {
-    if (!!exeEvent && camera.current && isCameraInitialized) {
-      cameraExecuter();
-    }
-  }, [exeEvent]);
-
-  const startRecording = useCallback(async () => {
-    await cameraExecuter();
-    const ii = setInterval(() => {
-      setExeEvent(new Date());
-    }, Number(number) * 1000);
-    setInter(ii);
-  }, []);
 
   return (
     <View style={styles.container}>
@@ -232,21 +184,6 @@ export function CameraPage({navigation}: Props): React.ReactElement {
       )}
 
       <StatusBarBlurBackground />
-
-      <Reanimated.View style={styles.flex}>
-        <TouchableOpacity
-          style={styles.recordingButton}
-          onPress={() => {
-            if (recording === false) {
-              setRecording(true);
-              startRecording();
-            } else {
-              setRecording(false);
-              clearInterval(inter);
-            }
-          }}
-        />
-      </Reanimated.View>
 
       <View style={styles.rightButtonRow}>
         {supportsCameraFlipping && (
