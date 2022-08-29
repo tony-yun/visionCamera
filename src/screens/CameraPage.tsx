@@ -185,6 +185,10 @@ export function CameraPage({navigation}: Props): React.ReactElement {
 
       <StatusBarBlurBackground />
 
+      <View style={styles.flex}>
+        <TouchableOpacity style={styles.recordingButton} />
+      </View>
+
       <View style={styles.rightButtonRow}>
         {supportsCameraFlipping && (
           <PressableOpacity
