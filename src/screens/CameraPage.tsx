@@ -35,6 +35,7 @@ import {useIsForeground} from '../components/useIsForeground';
 import {StatusBarBlurBackground} from '../components/StatusBarBlurBackground';
 import {PressableOpacity} from 'react-native-pressable-opacity';
 import IonIcon from 'react-native-vector-icons/Ionicons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type {Routes} from '../components/Routes';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useIsFocused} from '@react-navigation/core';
@@ -60,6 +61,7 @@ export function CameraPage({navigation}: Props): React.ReactElement {
   const isFocussed = useIsFocused();
   const isForeground = useIsForeground();
   const isActive = isFocussed && isForeground;
+  const [torch, setTorch] = useState<'off' | 'on'>('off');
 
   const [cameraPosition, setCameraPosition] = useState<'front' | 'back'>(
     'back',
@@ -73,6 +75,7 @@ export function CameraPage({navigation}: Props): React.ReactElement {
     () => devices.back != null && devices.front != null,
     [devices.back, devices.front],
   );
+  const supportsTorch = device?.hasTorch ?? false;
 
   //#region Animated Zoom
   // This just maps the zoom factor to a percentage value.
@@ -104,6 +107,9 @@ export function CameraPage({navigation}: Props): React.ReactElement {
   const onFlipCameraPressed = useCallback(() => {
     setCameraPosition(p => (p === 'back' ? 'front' : 'back'));
     console.log(cameraPosition);
+  }, []);
+  const onTorchPressed = useCallback(() => {
+    setTorch(f => (f === 'off' ? 'on' : 'off'));
   }, []);
 
   //#region Effects
@@ -178,6 +184,7 @@ export function CameraPage({navigation}: Props): React.ReactElement {
               onFrameProcessorPerformanceSuggestionAvailable={
                 onFrameProcessorSuggestionAvailable
               }
+              torch={torch}
             />
           </Reanimated.View>
         </PinchGestureHandler>
@@ -196,6 +203,18 @@ export function CameraPage({navigation}: Props): React.ReactElement {
             onPress={onFlipCameraPressed}
             disabledOpacity={0.4}>
             <IonIcon name="camera-reverse" color="white" size={24} />
+          </PressableOpacity>
+        )}
+        {supportsTorch && (
+          <PressableOpacity
+            style={styles.button}
+            onPress={onTorchPressed}
+            disabledOpacity={0.4}>
+            <MaterialCommunityIcons
+              name={torch === 'on' ? 'flashlight' : 'flashlight-off'}
+              color="white"
+              size={24}
+            />
           </PressableOpacity>
         )}
       </View>
