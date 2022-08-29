@@ -38,6 +38,7 @@ import IonIcon from 'react-native-vector-icons/Ionicons';
 import type {Routes} from '../components/Routes';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useIsFocused} from '@react-navigation/core';
+import axios from 'axios';
 
 const ReanimatedCamera = Reanimated.createAnimatedComponent(Camera);
 Reanimated.addWhitelistedNativeProps({
@@ -55,6 +56,11 @@ export function CameraPage({navigation}: Props): React.ReactElement {
   const [hasMicrophonePermission, setHasMicrophonePermission] = useState(false);
   const zoom = useSharedValue(0);
   const isPressingButton = useSharedValue(false);
+  const [recording, setRecording] = useState(false);
+  const [inter, setInter] = useState(null);
+  const [exeEvent, setExeEvent] = useState(null);
+  const isRecording = useRef(false);
+  const [number, setNumber] = useState(60);
 
   // check if camera page is active
   const isFocussed = useIsFocused();
@@ -64,74 +70,15 @@ export function CameraPage({navigation}: Props): React.ReactElement {
   const [cameraPosition, setCameraPosition] = useState<'front' | 'back'>(
     'back',
   );
-  const [enableHdr, setEnableHdr] = useState(false);
-  const [flash, setFlash] = useState<'off' | 'on'>('off');
-  const [enableNightMode, setEnableNightMode] = useState(false);
 
   // camera format settings
   const devices = useCameraDevices();
   const device = devices[cameraPosition];
-  const formats = useMemo<CameraDeviceFormat[]>(() => {
-    if (device?.formats == null) return [];
-    return device.formats.sort(sortFormats);
-  }, [device?.formats]);
-
-  //#region Memos
-  const [is60Fps, setIs60Fps] = useState(true);
-  const fps = useMemo(() => {
-    if (!is60Fps) return 30;
-
-    if (enableNightMode && !device?.supportsLowLightBoost) {
-      // User has enabled Night Mode, but Night Mode is not natively supported, so we simulate it by lowering the frame rate.
-      return 30;
-    }
-
-    const supportsHdrAt60Fps = formats.some(
-      f =>
-        f.supportsVideoHDR &&
-        f.frameRateRanges.some(r => frameRateIncluded(r, 60)),
-    );
-    if (enableHdr && !supportsHdrAt60Fps) {
-      // User has enabled HDR, but HDR is not supported at 60 FPS.
-      return 30;
-    }
-
-    const supports60Fps = formats.some(f =>
-      f.frameRateRanges.some(r => frameRateIncluded(r, 60)),
-    );
-    if (!supports60Fps) {
-      // 60 FPS is not supported by any format.
-      return 30;
-    }
-    // If nothing blocks us from using it, we default to 60 FPS.
-    return 60;
-  }, [
-    device?.supportsLowLightBoost,
-    enableHdr,
-    enableNightMode,
-    formats,
-    is60Fps,
-  ]);
 
   const supportsCameraFlipping = useMemo(
     () => devices.back != null && devices.front != null,
     [devices.back, devices.front],
   );
-  const supportsFlash = device?.hasFlash ?? false;
-
-  const format = useMemo(() => {
-    let result = formats;
-    if (enableHdr) {
-      // We only filter by HDR capable formats if HDR is set to true.
-      // Otherwise we ignore the `supportsVideoHDR` property and accept formats which support HDR `true` or `false`
-      result = result.filter(f => f.supportsVideoHDR || f.supportsPhotoHDR);
-    }
-
-    // find the first format that includes the given FPS
-    return result.find(f =>
-      f.frameRateRanges.some(r => frameRateIncluded(r, fps)),
-    );
-  }, [formats, fps, enableHdr]);
 
   //#region Animated Zoom
   // This just maps the zoom factor to a percentage value.
@@ -169,11 +116,8 @@ export function CameraPage({navigation}: Props): React.ReactElement {
 
   const onFlipCameraPressed = useCallback(() => {
     setCameraPosition(p => (p === 'back' ? 'front' : 'back'));
+    console.log(cameraPosition);
   }, []);
-  const onFlashPressed = useCallback(() => {
-    setFlash(f => (f === 'off' ? 'on' : 'off'));
-  }, []);
-  //#endregion
 
   //#region Effects
   const neutralZoom = device?.neutralZoom ?? 1;
@@ -216,18 +160,6 @@ export function CameraPage({navigation}: Props): React.ReactElement {
       );
     },
   });
-  //#endregion
-
-  if (device != null && format != null) {
-    console.log(
-      `Re-rendering camera page with ${
-        isActive ? 'active' : 'inactive'
-      } camera. ` +
-        `Device: "${device.name}" (${format.photoWidth}x${format.photoHeight} @ ${fps}fps)`,
-    );
-  } else {
-    console.log('re-rendering camera page without active camera');
-  }
 
   const onFrameProcessorSuggestionAvailable = useCallback(
     (suggestion: FrameProcessorPerformanceSuggestion) => {
@@ -237,6 +169,41 @@ export function CameraPage({navigation}: Props): React.ReactElement {
     },
     [],
   );
+  const cameraExecuter = async () => {
+    const video = await camera.current?.startRecording({
+      onRecordingFinished: video => console.log(video),
+      onRecordingError: error => console.error(error),
+    });
+    //Send to server
+    let formData = new FormData();
+    formData.append('file', {
+      name: 'myVideo.mp4',
+      uri: video?.uri,
+      type: 'video/mp4',
+    });
+    axios
+      .post('http://localhost/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }) //android:screenOrientation="landscape"
+      .then(res => console.log(res))
+      .catch(err => console.log(err));
+  };
+
+  useEffect(() => {
+    if (!!exeEvent && camera.current && isCameraInitialized) {
+      cameraExecuter();
+    }
+  }, [exeEvent]);
+
+  const startRecording = useCallback(async () => {
+    await cameraExecuter();
+    const ii = setInterval(() => {
+      setExeEvent(new Date());
+    }, Number(number) * 1000);
+    setInter(ii);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -247,8 +214,6 @@ export function CameraPage({navigation}: Props): React.ReactElement {
               ref={camera}
               style={StyleSheet.absoluteFill}
               device={device}
-              format={format}
-              fps={fps}
               isActive={isActive}
               onInitialized={onInitialized}
               onError={onError}
@@ -269,7 +234,18 @@ export function CameraPage({navigation}: Props): React.ReactElement {
       <StatusBarBlurBackground />
 
       <Reanimated.View style={styles.flex}>
-        <TouchableOpacity style={styles.recordingButton} />
+        <TouchableOpacity
+          style={styles.recordingButton}
+          onPress={() => {
+            if (recording === false) {
+              setRecording(true);
+              startRecording();
+            } else {
+              setRecording(false);
+              clearInterval(inter);
+            }
+          }}
+        />
       </Reanimated.View>
 
       <View style={styles.rightButtonRow}>
@@ -279,18 +255,6 @@ export function CameraPage({navigation}: Props): React.ReactElement {
             onPress={onFlipCameraPressed}
             disabledOpacity={0.4}>
             <IonIcon name="camera-reverse" color="white" size={24} />
-          </PressableOpacity>
-        )}
-        {supportsFlash && (
-          <PressableOpacity
-            style={styles.button}
-            onPress={onFlashPressed}
-            disabledOpacity={0.4}>
-            <IonIcon
-              name={flash === 'on' ? 'flash' : 'flash-off'}
-              color="white"
-              size={24}
-            />
           </PressableOpacity>
         )}
       </View>
