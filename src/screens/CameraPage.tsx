@@ -81,7 +81,7 @@ export function CameraPage({navigation}: Props): React.ReactElement {
   // This just maps the zoom factor to a percentage value.
   // so e.g. for [min, neutr., max] values [1, 2, 128] this would result in [0, 0.0081, 1]
   const minZoom = device?.minZoom ?? 1;
-  const maxZoom = Math.min(device?.maxZoom ?? 1, MAX_ZOOM_FACTOR);
+  const maxZoom = Math.max(device?.maxZoom ?? 1, MAX_ZOOM_FACTOR);
 
   const cameraAnimatedProps = useAnimatedProps(() => {
     const z = Math.max(Math.min(zoom.value, maxZoom), minZoom);
